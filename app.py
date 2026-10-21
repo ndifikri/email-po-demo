@@ -1,7 +1,6 @@
 """Dashboard Streamlit: pemantau email PO kebutuhan tenaga kerja."""
 from __future__ import annotations
 
-import html
 from datetime import datetime
 
 import pandas as pd
@@ -91,14 +90,10 @@ def render_login() -> None:
     st.write("Hubungkan akun Gmail untuk mulai memantau email PO kebutuhan tenaga kerja. Akses yang diminta hanya baca (read-only).")
     if "auth_url" not in st.session_state:
         st.session_state["auth_url"] = gmail.authorization_url(cfg)
-    url = html.escape(st.session_state["auth_url"], quote=True)
-    # _top: di Streamlit Cloud app berjalan di dalam iframe, dan Google menolak login di iframe.
-    st.markdown(
-        f'<a href="{url}" target="_top" style="display:inline-block;padding:0.5rem 1rem;'
-        'border-radius:0.5rem;background:#1a73e8;color:white;text-decoration:none;font-weight:600;">'
-        "Login dengan Google</a>",
-        unsafe_allow_html=True,
-    )
+    # Tab baru: di Streamlit Cloud app berjalan di iframe ber-sandbox yang memblokir link
+    # target="_top", dan Google juga menolak login di dalam iframe.
+    st.link_button("Login dengan Google", st.session_state["auth_url"], type="primary")
+    st.caption("Login dibuka di tab baru. Setelah selesai, lanjutkan di tab tersebut; tab ini boleh ditutup.")
 
 
 handle_oauth_callback()

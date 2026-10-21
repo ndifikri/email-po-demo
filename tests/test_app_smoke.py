@@ -51,7 +51,9 @@ def make_app():
 def test_login_page_when_no_token(paths):
     at = make_app().run()
     assert not at.exception
-    assert "Login dengan Google" in "".join(m.value for m in at.markdown)
+    [button] = at.get("link_button")
+    assert button.proto.label == "Login dengan Google"
+    assert button.proto.url.startswith("https://accounts.google.com/")
 
 
 def test_missing_secret_shows_error(paths):
