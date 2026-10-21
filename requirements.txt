@@ -1,0 +1,8 @@
+streamlit==1.66.0
+openai==3.35.1
+pydantic==2.14.1
+google-auth==2.62.0
+google-auth-oauthlib==1.5.0
+google-api-python-client==2.201.0
+beautifulsoup4==4.15.0
+pandas==3.0.6

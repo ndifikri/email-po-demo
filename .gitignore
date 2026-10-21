@@ -218,3 +218,10 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# --- email-po-demo: secrets & data lokal (jangan di-commit) ---
+.streamlit/secrets.toml
+.secrets/
+data/
+api_key.txt
+email_po_project.json
