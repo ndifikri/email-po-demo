@@ -12,6 +12,7 @@ APP = str(Path(__file__).resolve().parent.parent / "app.py")
 SECRETS = {
     "openai": {"api_key": "sk-test"},
     "google_oauth": {"client_id": "cid", "client_secret": "secret"},
+    "auth": {"username": "admin", "password": "test-pass#1"},
 }
 
 
@@ -48,12 +49,64 @@ def make_app():
     return at
 
 
-def test_login_page_when_no_token(paths):
+def login(at, username="admin", password="test-pass#1"):
+    """Isi form login admin lalu submit."""
+    at.text_input[0].input(username)
+    at.text_input[1].input(password)
+    at.button[0].click()
+    return at.run()
+
+
+def assert_login_form_only(at):
+    assert [t.label for t in at.text_input] == ["Username", "Password"]
+    assert not at.get("link_button")
+    assert not at.metric
+    assert not at.dataframe
+
+
+def test_login_form_first(paths):
     at = make_app().run()
     assert not at.exception
+    assert_login_form_only(at)
+
+
+def test_login_form_first_even_with_gmail_token(paths):
+    with patch("po_monitor.gmail_client.load_credentials", return_value=object()), patch(
+        "po_monitor.gmail_client.GmailClient", FakeGmail
+    ):
+        at = make_app().run()
+    assert not at.exception
+    assert_login_form_only(at)
+    assert not any("tim@contoh.co.id" in m.value for m in at.markdown)
+
+
+def test_wrong_password_shows_error(paths):
+    at = login(make_app().run(), password="Test-pass#1")
+    assert not at.exception
+    assert [e.value for e in at.error] == ["Username atau password salah"]
+    assert_login_form_only(at)
+
+
+def test_connect_gmail_after_login_when_no_token(paths):
+    at = login(make_app().run())
+    assert not at.exception
+    assert not at.text_input
     [button] = at.get("link_button")
-    assert button.proto.label == "Login dengan Google"
+    assert button.proto.label == "Hubungkan Gmail"
     assert button.proto.url.startswith("https://accounts.google.com/")
+
+
+def test_oauth_callback_waits_for_admin_login(paths):
+    with patch("po_monitor.gmail_client.exchange_code") as exchange:
+        at = make_app()
+        at.query_params["code"] = "kode"
+        at.query_params["state"] = "st"
+        at.run()
+        exchange.assert_not_called()
+        assert_login_form_only(at)
+        login(at)
+        exchange.assert_called_once()
+        assert exchange.call_args.args[1:] == ("kode", "st")
 
 
 def test_missing_secret_shows_error(paths):
@@ -90,7 +143,7 @@ def test_dashboard_with_data(paths):
     with patch("po_monitor.gmail_client.load_credentials", return_value=object()), patch(
         "po_monitor.gmail_client.GmailClient", FakeGmail
     ):
-        at = make_app().run()
+        at = login(make_app().run())
     assert not at.exception, at.exception
     metrics = {m.label: m.value for m in at.metric}
     assert metrics["Email PO"] == "1"
@@ -101,3 +154,32 @@ def test_dashboard_with_data(paths):
     assert table["Detail"].tolist() == ["5 Security untuk lokasi Cikarang"]
     assert any("Listener" in m.value for m in at.markdown)
     assert not any(b.label == "🔄 Cek sekarang" for b in at.button)
+
+
+def test_logout_keeps_gmail_and_disconnect_removes_token(paths):
+    _, token = paths
+    token.parent.mkdir(parents=True, exist_ok=True)
+    token.write_text("{}", encoding="utf-8")
+
+    def creds_if_token(cfg):
+        return object() if cfg.token_path.exists() else None
+
+    with patch("po_monitor.gmail_client.load_credentials", side_effect=creds_if_token), patch(
+        "po_monitor.gmail_client.GmailClient", FakeGmail
+    ):
+        at = login(make_app().run())
+        assert not at.exception, at.exception
+        assert any("tim@contoh.co.id" in m.value for m in at.sidebar.markdown)
+
+        [logout] = [b for b in at.sidebar.button if b.label == "Logout"]
+        logout.click().run()
+        assert_login_form_only(at)
+        assert token.exists()
+
+        login(at)
+        [disconnect] = [b for b in at.sidebar.button if b.label == "Putuskan Gmail"]
+        disconnect.click().run()
+    assert not token.exists()
+    assert not at.text_input
+    [button] = at.get("link_button")
+    assert button.proto.label == "Hubungkan Gmail"

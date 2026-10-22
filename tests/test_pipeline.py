@@ -76,7 +76,13 @@ class Clock:
 
 @pytest.fixture
 def env(tmp_path):
-    cfg = load_config({"openai": {"api_key": "sk"}, "google_oauth": {"client_id": "c", "client_secret": "s"}})
+    cfg = load_config(
+        {
+            "openai": {"api_key": "sk"},
+            "google_oauth": {"client_id": "c", "client_secret": "s"},
+            "auth": {"username": "u", "password": "p"},
+        }
+    )
     cfg = dataclasses.replace(cfg, token_path=tmp_path / "token.json")
     cfg.token_path.write_text("{}")  # sudah login
     store = Storage(tmp_path / "t.db")

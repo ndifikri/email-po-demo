@@ -8,6 +8,7 @@ import streamlit as st
 from openai import OpenAI
 
 from po_monitor import gmail_client as gmail
+from po_monitor.auth import check_credentials
 from po_monitor.config import get_config
 from po_monitor.listener import ACTIVE, ERROR, Listener
 from po_monitor.llm import analyze_email
@@ -58,11 +59,33 @@ listener = get_listener()
 
 
 def reset_session(message: str | None = None) -> None:
+    """Putuskan Gmail; sesi login admin tetap dipertahankan."""
     gmail.logout(cfg)
     st.session_state.clear()
+    st.session_state["admin_authenticated"] = True
     if message:
         st.session_state["auth_message"] = message
     listener.wake()
+
+
+# --- Login admin -------------------------------------------------------------------
+
+
+def require_admin_login() -> None:
+    """Tampilkan form login dan hentikan halaman sampai admin berhasil login."""
+    if st.session_state.get("admin_authenticated"):
+        return
+    st.title("📨 Monitor PO Tenaga Kerja")
+    with st.form("admin_login"):
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
+        submitted = st.form_submit_button("Masuk", type="primary")
+    if submitted:
+        if check_credentials(cfg, username, password):
+            st.session_state["admin_authenticated"] = True
+            st.rerun()
+        st.error("Username atau password salah")
+    st.stop()
 
 
 # --- Autentikasi Gmail ---------------------------------------------------------
@@ -92,10 +115,14 @@ def render_login() -> None:
         st.session_state["auth_url"] = gmail.authorization_url(cfg)
     # Tab baru: di Streamlit Cloud app berjalan di iframe ber-sandbox yang memblokir link
     # target="_top", dan Google juga menolak login di dalam iframe.
-    st.link_button("Login dengan Google", st.session_state["auth_url"], type="primary")
-    st.caption("Login dibuka di tab baru. Setelah selesai, lanjutkan di tab tersebut; tab ini boleh ditutup.")
+    st.link_button("Hubungkan Gmail", st.session_state["auth_url"], type="primary")
+    st.caption(
+        "Halaman izin Google dibuka di tab baru. Setelah selesai, login admin sekali lagi "
+        "di tab tersebut untuk menyelesaikan koneksi; tab ini boleh ditutup."
+    )
 
 
+require_admin_login()
 handle_oauth_callback()
 
 if "account" not in st.session_state:
@@ -123,6 +150,9 @@ with st.sidebar:
         "Email yang masuk saat aplikasi mati atau laptop sleep diabaikan."
     )
     if st.button("Logout", width="stretch"):
+        st.session_state.clear()  # hanya sesi admin; Gmail & listener tetap jalan
+        st.rerun()
+    if st.button("Putuskan Gmail", width="stretch"):
         reset_session()
         st.rerun()
 

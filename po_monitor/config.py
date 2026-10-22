@@ -12,6 +12,8 @@ REQUIRED_KEYS = [
     ("openai", "api_key"),
     ("google_oauth", "client_id"),
     ("google_oauth", "client_secret"),
+    ("auth", "username"),
+    ("auth", "password"),
 ]
 
 
@@ -49,6 +51,8 @@ class AppConfig:
     openai_api_key: str
     model: str
     google: GoogleOAuthConfig
+    admin_username: str
+    admin_password: str
     poll_interval_seconds: int = 15
     max_emails_per_cycle: int = 20
     confidence_threshold: float = 0.6
@@ -69,6 +73,7 @@ def load_config(secrets: Mapping) -> AppConfig:
 
     openai_cfg = secrets["openai"]
     g = secrets["google_oauth"]
+    auth = secrets["auth"]
     app = secrets.get("app") or {}
 
     return AppConfig(
@@ -82,6 +87,8 @@ def load_config(secrets: Mapping) -> AppConfig:
             token_uri=g.get("token_uri", "https://oauth2.googleapis.com/token"),
             redirect_uri=g.get("redirect_uri", "http://localhost:8501"),
         ),
+        admin_username=auth["username"],
+        admin_password=auth["password"],
         poll_interval_seconds=int(app.get("poll_interval_seconds", 15)),
         max_emails_per_cycle=int(app.get("max_emails_per_cycle", 20)),
         confidence_threshold=float(app.get("confidence_threshold", 0.6)),

@@ -52,6 +52,7 @@ Semua secret dibaca dari `st.secrets`. Formatnya ada di [`.streamlit/secrets.tom
 | `[google_oauth]` | `client_id`, `client_secret` | wajib, dari OAuth client tipe *Web application* |
 | | `project_id` | ID project Google Cloud |
 | | `redirect_uri` | URL aplikasi, harus sama persis dengan *Authorized redirect URI* di Google Cloud |
+| `[auth]` | `username`, `password` | wajib, kredensial login admin aplikasi |
 | `[app]` | `poll_interval_seconds`, `max_emails_per_cycle`, `confidence_threshold`, `max_body_chars` | opsional |
 
 `secrets.toml`, token Gmail (`.secrets/`), dan database (`data/`) sudah di-`.gitignore`. Jangan pernah meng-commit file tersebut.
@@ -67,7 +68,16 @@ cp .streamlit/secrets.toml.example .streamlit/secrets.toml   # lalu isi nilainya
 streamlit run app.py
 ```
 
-Buka `http://localhost:8501`, klik **Login dengan Google**, dan izinkan akses baca Gmail. Untuk lokal, `redirect_uri = "http://localhost:8501"`.
+Buka `http://localhost:8501`, login dengan username & password dari `[auth]`, lalu klik **Hubungkan Gmail** dan izinkan akses baca Gmail. Untuk lokal, `redirect_uri = "http://localhost:8501"`.
+
+### Login
+
+1. **Login admin** — setiap sesi browser dimulai dengan form username & password (dari secrets `[auth]`). Login berlaku per tab: refresh atau tab baru meminta login lagi.
+2. **Hubungkan Gmail** — jika belum ada token Gmail, klik tombol ini. Halaman izin Google dibuka di tab baru; setelah kembali ke aplikasi, login admin sekali lagi di tab tersebut untuk menyelesaikan koneksi.
+
+Di sidebar:
+- **Logout** hanya mengakhiri sesi admin. Gmail tetap terhubung dan listener tetap memproses email.
+- **Putuskan Gmail** menghapus token Gmail; listener berhenti sampai Gmail dihubungkan lagi.
 
 Menjalankan test:
 
@@ -81,20 +91,21 @@ pytest -q
 2. Di [share.streamlit.io](https://share.streamlit.io), pilih **Create app**, lalu isi repo, branch, dan *Main file path* `app.py`.
    Di **Advanced settings**, pilih Python **3.14** (versi yang dipakai saat pengembangan).
 3. Masih di **Advanced settings → Secrets**, tempel isi `secrets.toml` Anda dengan
-   `redirect_uri = "https://<nama-app>.streamlit.app"` (tanpa garis miring di akhir).
-   Secrets bisa diubah nanti lewat **Settings → Secrets**.
+   `redirect_uri = "https://<nama-app>.streamlit.app"` (tanpa garis miring di akhir),
+   termasuk section `[auth]` berisi username & password admin. Tanpa `[auth]`, aplikasi menampilkan error secret wajib.
+   Secrets bisa diubah nanti lewat **Settings → Secrets** (mis. untuk mengganti password) tanpa deploy ulang.
 4. **Google Cloud Console** (APIs & Services):
    - Aktifkan **Gmail API**.
    - Pada OAuth client, tambahkan **Authorized redirect URI** `https://<nama-app>.streamlit.app`. URI localhost boleh tetap ada.
    - Jika OAuth consent screen masih mode *Testing*, tambahkan alamat Gmail Anda sebagai *Test user*.
      Di mode ini refresh token kadaluarsa tiap 7 hari, jadi aplikasi akan meminta login ulang.
-5. Buka URL aplikasi, lalu login dengan Google.
+5. Buka URL aplikasi, login admin, lalu klik **Hubungkan Gmail**.
 
 ### Penting sebelum hosting
 
-- **Aplikasi ini single-user.** Token Gmail disimpan satu untuk seluruh aplikasi, bukan per pengunjung. Siapa pun yang membuka URL akan melihat dashboard inbox yang sedang login, dan bisa logout atau login dengan akun lain.
-  **Jadikan app private.** Di **Settings → Sharing**, batasi viewer hanya ke email yang diizinkan.
-- **Penyimpanan tidak permanen.** Filesystem Streamlit Cloud bersifat sementara. Database SQLite dan token Gmail hilang saat app di-reboot, di-redeploy, atau tidur. Setelah itu riwayat kosong lagi dan Anda perlu login ulang.
+- **Aplikasi ini single-user.** Token Gmail disimpan satu untuk seluruh aplikasi, bukan per pengunjung. Siapa pun yang tahu username & password admin akan melihat dashboard inbox yang terhubung, dan bisa memutus atau mengganti akun Gmail.
+  Pakai password yang kuat, dan sebaiknya tetap **jadikan app private** di **Settings → Sharing**, karena form login tidak membatasi jumlah percobaan.
+- **Penyimpanan tidak permanen.** Filesystem Streamlit Cloud bersifat sementara. Database SQLite dan token Gmail hilang saat app di-reboot, di-redeploy, atau tidur. Setelah itu riwayat kosong lagi dan Anda perlu menghubungkan Gmail lagi.
 - **Listener hanya jalan selama app aktif.** App yang lama tidak dikunjungi akan ditidurkan oleh Streamlit Cloud. Email yang masuk selama itu tidak diproses, dan listener baru jalan lagi setelah halaman dibuka.
 - Setiap email baru dikirim ke OpenAI, jadi pemakaian API mengikuti volume email masuk.
 
